@@ -1,6 +1,7 @@
-import pygame
 import random
 import math
+from pygame import mixer
+import pygame
 
 pygame.init()
 pygame.display.set_caption('Space Invaders')
@@ -11,14 +12,17 @@ player_img = pygame.image.load('./images/player.png')
 bg_img = pygame.image.load('./images/background.png')
 enemy_img = pygame.image.load('./images/enemy.png')
 bullet_img = pygame.image.load('./images/bullet.png')
+mixer.music.load('./audio/background.wav')
+mixer.music.play(-1)
 font = pygame.font.Font('freesansbold.ttf', 32)
 player_x_initial = 365
 player_y_initial = 650
+GAME_OVER = False
 
 
 def player_position(x, y, movement_type= None):
     if movement_type:
-        movement_clip = 2.5
+        movement_clip = 6
         min_position_x = 5
         max_position_x = 730
         min_position_y = 570
@@ -54,7 +58,7 @@ def enemy_position(ex, ey, horiz_movement_type, player_x, player_y):
     distance_to_player_x = abs(player_x - ex)
     distance_to_player_y = abs(player_y - ey)
     if ey >= 700 or (distance_to_player_x<=50 and distance_to_player_y<=50):
-        print('game over')
+        GAME_OVER = True
     screen.blit(enemy_img, (ex, ey))        
     return ex, ey, horiz_movement_type
 
@@ -79,21 +83,26 @@ def show_score(score):
     rendering = font.render(f'Score : {score}', True, (255,255,255))
     screen.blit(rendering, (text_x, text_y))
 
+
+def game_over(msg):
+    text_x = 100
+    text_y = 300
+    rendering = font.render(f'{msg} (press esc to exit)', True, (255,255,255))
+    screen.blit(rendering, (text_x, text_y))   
+
 def main():
     running = True
     player_x = player_x_initial
     player_y = player_y_initial
-    enemy_x = random.randint(50,750)
-    enemy_y = random.randint(50,150)
     next_bullet = 'ready'
     bullet_x = 0
     bullet_y = 0
     score = 0
-
-    num_of_enemies = 10
+    num_of_enemies = 20
     enemies = []
+
     for i in range(num_of_enemies):
-        enemies.append( (random.randint(50,750), random.randint(50,150), 'RIGHT' ))
+        enemies.append( (random.randint(50,750), random.randint(50,350), 'RIGHT' ))
 
     while running:
         for event in pygame.event.get():
@@ -102,9 +111,16 @@ def main():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     if next_bullet == 'ready':
+                        bullet_sound = mixer.Sound('./audio/laser.wav')
+                        bullet_sound.play()
                         bullet_x = player_x + 10
                         bullet_y = player_y + 16
                         bullet_y, next_bullet = fire_bullet(bullet_x, bullet_y)
+                if event.key == pygame.K_ESCAPE:
+                    if GAME_OVER or not num_of_enemies:
+                        print('hi')
+                        pygame.quit()
+                        running = False
         
         screen.blit(bg_img, (0,0))
         player_x, player_y = player_position(player_x, player_y)
@@ -121,6 +137,7 @@ def main():
 
         if next_bullet == 'fired':
             bullet_y, next_bullet = fire_bullet(bullet_x, bullet_y)
+
         for i in range(num_of_enemies):
 
             enemy_x, enemy_y, horiz_movement_type = enemy_position(enemies[i][0], enemies[i][1], enemies[i][2], player_x, player_y)
@@ -128,13 +145,27 @@ def main():
             destroyed = collision(enemy_x, enemy_y, bullet_x, bullet_y)
             
             if destroyed:
+                explosion_sound = mixer.Sound('./audio/explosion.wav')
+                explosion_sound.play()
                 score += 1
                 enemies[i] = None
+                next_bullet = 'ready'
             else:
                 enemies[i] = (enemy_x, enemy_y, horiz_movement_type )
 
+
         enemies = [i for i in enemies if i]
         num_of_enemies = len(enemies)
+
+        if not num_of_enemies or GAME_OVER:
+            if not num_of_enemies:
+                # won_sound = mixer.Sound('./audio/won.wav')
+                # won_sound.play()
+                game_over('You Won!')
+            else:
+                # lost_sound = mixer.Sound('./audio/lost.wav')
+                # lost_sound.play()
+                game_over('You Lost!')
 
         show_score(score)
         pygame.display.update()
